@@ -1,0 +1,40 @@
+# Go binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# OS specifics
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# App specific
+Musica/
+*.zip
+ffmpeg_tmp.zip
+yt-dlp
+yt-dlp.exe
+ffmpeg
+ffmpeg.exe
+
