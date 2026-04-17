@@ -1,100 +1,100 @@
 # 🎵 YouTube Downloader
 
-Una aplicación portable y moderna en Go para descargar canciones desde YouTube, YouTube Music o buscar por nombre directamente a **128kbps en MP3**.
+A portable and modern Go application to download songs from YouTube, YouTube Music, or search by name directly at **128kbps MP3**.
 
-## ✨ Características
+## ✨ Features
 
-- **UI moderna** con tema oscuro (Fyne v2)
-- **Descarga paralela** - hasta 3 canciones simultáneamente (configurable)
-- **Cuadro de texto multilínea** - pega múltiples URLs/nombres, uno por línea
-- **Barra de progreso** con porcentaje de canciones completadas
-- **Log en tiempo real** con timestamps y etiquetas por canción
-- **Selector de carpeta nativo** de Windows (cómodo y grande)
-- **Auto-descarga de dependencias** - yt-dlp y ffmpeg se descargan automáticamente al primer inicio
-- **Portable** - único ejecutable, sin instalación requerida
-- **Cross-platform** - código compatible con Windows, Linux y macOS (aunque hay algunos detalles Windows-específicos)
+- **Modern dark UI** (Fyne v2)
+- **Parallel downloads** - up to 3 songs simultaneously (configurable)
+- **Multiline text input** - paste multiple URLs/names, one per line
+- **Progress bar** showing percentage of songs completed
+- **Real-time logs** with timestamps and per-song tags
+- **Native Windows folder picker** (comfortable and large)
+- **Auto-download dependencies** - yt-dlp and ffmpeg are downloaded automatically on first run
+- **Portable** - single executable, no installation required
+- **Cross-platform** - code compatible with Windows, Linux and macOS
 
-## 🚀 Inicio rápido
+## 🚀 Quick Start
 
-### Requisitos
-- **Windows 10/11** (probado en ambas versiones)
-- **Go 1.21+** (solo si vas a compilar desde código)
-- **GCC/MinGW** (para compilar, recomendado usar MSYS2)
+### Requirements
+- **Windows 10/11** (tested on both versions)
+- **Go 1.21+** (only if compiling from source)
+- **GCC/MinGW** (for compiling, MSYS2 recommended)
 
-### Usando el ejecutable precompilado
+### Using the Precompiled Executable
 
-1. Descarga `YouTubeDownloader.exe` desde este repositorio
-2. Ejecuta el `.exe`
-   - **Primera vez:** Se descargarán automáticamente `yt-dlp.exe` (~10MB) y `ffmpeg.exe` (~8MB) en la misma carpeta
-   - Las canciones se guardan en la carpeta `Musica/` junto al `.exe`
-3. ¡A descargar!
+1. Download `YouTubeDownloader.exe` from this repository
+2. Run the `.exe`
+   - **First time:** Will automatically download `yt-dlp.exe` (~10MB) and `ffmpeg.exe` (~8MB) in the same folder
+   - Songs are saved in the `Musica/` folder next to the `.exe`
+3. Ready to download!
 
-### Compilar desde código
+### Compiling from Source
 
-#### Requisitos previos
+#### Prerequisites
 
-1. **Instalar Go**
+1. **Install Go**
    ```bash
-   # Descarga desde https://golang.org/dl/
-   # Verifica la instalación
+   # Download from https://golang.org/dl/
+   # Verify installation
    go version
    ```
 
-2. **Instalar MSYS2 + GCC** (si no tienes compilador)
+2. **Install MSYS2 + GCC** (if you don't have a compiler)
    ```bash
-   # Descarga MSYS2 desde https://www.msys2.org/
-   # Durante la instalación, selecciona la instalación con mingw64
-   # Después de instalar, abre MSYS2 y ejecuta:
+   # Download MSYS2 from https://www.msys2.org/
+   # During installation, select the mingw64 installation
+   # After installing, open MSYS2 and run:
    pacman -S mingw-w64-ucrt-x86_64-gcc
    ```
 
-3. **Clonar/descargar el repositorio**
+3. **Clone/Download the Repository**
    ```bash
-   git clone https://github.com/tuusuario/YoutubeDownloader.git
+   git clone https://github.com/yourusername/YoutubeDownloader.git
    cd YoutubeDownloader
    ```
 
-#### Compilación
+#### Compilation
 
 ```bash
-# Opción 1: En Windows PowerShell (recomendado)
+# Option 1: In Windows PowerShell (recommended)
 $env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"
 go build -ldflags="-H windowsgui -s -w" -o YouTubeDownloader.exe .
 
-# Opción 2: Ejecutar el archivo build.bat (si está en el repositorio)
+# Option 2: Run the build.bat file (if in repository)
 .\build.bat
 ```
 
-**Explicación de flags:**
-- `-H windowsgui` - Oculta la ventana de consola (solo muestra la UI de Fyne)
-- `-s -w` - Minifica el ejecutable (sin debug info)
+**Flag explanation:**
+- `-H windowsgui` - Hides the console window (shows only the Fyne UI)
+- `-s -w` - Minifies the executable (no debug info)
 
-## 📖 Cómo usar
+## 📖 How to Use
 
-### Interfaz
+### Interface
 
 ```
 ┌─────────────────────────────────────┐
 │   🎵 YouTube Downloader             │
 ├─────────────────────────────────────┤
-│ [Cuadro de texto multilínea]        │
-│  Pegá URLs o nombres aquí...        │
+│ [Multiline text box]                │
+│  Paste URLs or names here...        │
 │                                     │
-│ 📁 ~/Music/  [Cambiar carpeta]      │
+│ 📁 ~/Music/  [Change folder]        │
 ├─────────────────────────────────────┤
-│ [Log de descarga en tiempo real]    │
-│ [15:04:05] ✅ yt-dlp listo.         │
-│ [15:04:06] 📋 Iniciando 3 canciones │
+│ [Download real-time log]            │
+│ [15:04:05] ✅ yt-dlp ready.         │
+│ [15:04:06] 📋 Starting 3 songs      │
 │ [15:04:07] [1/3] ▶ Bohemian...      │
 │ ...                                 │
 ├─────────────────────────────────────┤
-│ Progreso: [===========     ] 2 / 3   │
+│ Progress: [===========     ] 2 / 3   │
 └─────────────────────────────────────┘
 ```
 
-### Ejemplos de entrada
+### Input Examples
 
-Puedes mezclar URLs y nombres de canciones:
+You can mix URLs and song names:
 
 ```
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
@@ -104,158 +104,160 @@ Hotel California Eagles
 Shape of You Ed Sheeran
 ```
 
-Presiona **"⬇ Descargar"** y las 5 canciones se descargarán en paralelo (máx 3 simultáneas).
+Press **"⬇ Download"** and all 5 songs will download in parallel (max 3 simultaneous).
 
-### Cambiar carpeta de descarga
+### Change Download Folder
 
-1. Click en **"Cambiar carpeta"**
-2. Se abre el explorador nativo de Windows
-3. Selecciona una carpeta y presiona OK
-4. Las futuras descargas irán a esa carpeta
+1. Click **"Change folder"**
+2. The native Windows explorer opens
+3. Select a folder and press OK
+4. Future downloads will go to that folder
 
-## 🏗️ Estructura del proyecto
+## 🏗️ Project Structure
 
 ```
 YoutubeDownloader/
-├── main.go                 # Código principal (UI + lógica de descarga)
-├── zip_extract.go          # Extractor para ffmpeg.zip
-├── go.mod                  # Módulos de Go
-├── go.sum                  # Checksums de dependencias
-├── build.bat               # Script de compilación (Windows)
-├── YouTubeDownloader.exe   # Ejecutable compilado
-├── README.md               # Este archivo
-└── Musica/                 # Carpeta de descargas (creada automáticamente)
+├── main.go                 # Main code (UI + download logic)
+├── zip_extract.go          # ffmpeg.zip extractor
+├── sysproc_windows.go      # Windows-specific console hiding
+├── sysproc_other.go        # macOS/Linux no-op
+├── go.mod                  # Go modules
+├── go.sum                  # Dependency checksums
+├── build.bat               # Windows build script
+├── YouTubeDownloader.exe   # Compiled executable
+├── README.md               # This file
+└── Musica/                 # Downloads folder (created automatically)
 ```
 
-## 📦 Dependencias
+## 📦 Dependencies
 
-### Externas (código)
-- **fyne.io/fyne/v2** - Framework UI multiplataforma
+### External (Code)
+- **fyne.io/fyne/v2** - Cross-platform UI framework
 
-### Externas (ejecutables)
-Se descargan automáticamente:
-- **yt-dlp.exe** - Descargador de YouTube (GitHub: yt-dlp/yt-dlp)
-- **ffmpeg.exe** - Conversor de audio (GitHub: GyanD/codexffmpeg - build esencial)
+### External (Executables)
+Downloaded automatically:
+- **yt-dlp.exe** - YouTube downloader (GitHub: yt-dlp/yt-dlp)
+- **ffmpeg.exe** - Audio converter (GitHub: GyanD/codexffmpeg - essentials build)
 
-### Librerías Go (automáticas)
-Se instalan con `go mod tidy`:
-- `golang.org/x/text` - Soporte de idiomas
-- `golang.org/x/image` - Procesamiento de imágenes
+### Go Libraries (Automatic)
+Installed with `go mod tidy`:
+- `golang.org/x/text` - Language support
+- `golang.org/x/image` - Image processing
 - `github.com/go-gl/glfw/v3.3/glfw` - OpenGL
-- Y muchas más... (se manejan automáticamente)
+- And many more... (handled automatically)
 
-## ⚙️ Configuración avanzada
+## ⚙️ Advanced Configuration
 
-### Cambiar número máximo de descargas paralelas
+### Change Maximum Parallel Downloads
 
-Edita `main.go` línea ~24:
-
-```go
-const maxConcurrent = 3  // Cambia este número
-```
-
-**Recomendaciones:**
-- `2-3` - Para conexiones normales
-- `5+` - Si tienes fibra y YouTube no te bloquea
-- `1` - Si tienes problemas de conexión
-
-### Cambiar calidad de audio
-
-Edita `main.go` en la función `downloadOne()`, busca:
+Edit `main.go` line ~24:
 
 ```go
-"--audio-quality", "128K",  // Cambia 128K por 192K, 256K, etc.
+const maxConcurrent = 3  // Change this number
 ```
 
-**Opciones:** `128K`, `192K`, `256K`, `320K` (máximo)
+**Recommendations:**
+- `2-3` - For normal connections
+- `5+` - If you have fiber and YouTube doesn't block you
+- `1` - If you have connection issues
 
-### Cambiar carpeta por defecto
+### Change Audio Quality
 
-Edita `main.go` línea ~36:
+Edit `main.go` in the `downloadOne()` function, find:
 
 ```go
-outputDir = filepath.Join(appDir, "Musica")  // Cambia "Musica" por tu preferencia
+"--audio-quality", "128K",  // Change 128K to 192K, 256K, etc.
 ```
 
-## 🐛 Solución de problemas
+**Options:** `128K`, `192K`, `256K`, `320K` (maximum)
 
-### "❌ Error descargando yt-dlp"
-- Verifica que tienes conexión a internet
-- El firewall podría bloquear las descargas
-- Intenta descargar manualmente desde: https://github.com/yt-dlp/yt-dlp/releases
+### Change Default Folder
 
-### "⚠ Error con ffmpeg"
-- Similar al anterior, verifica conexión
-- O descarga manualmente desde: https://github.com/GyanD/codexffmpeg/releases
-- Coloca `ffmpeg.exe` en la misma carpeta que el app
+Edit `main.go` line ~36:
 
-### "No encuentra yt-dlp"
-- Asegúrate de que `yt-dlp.exe` está en la misma carpeta que `YouTubeDownloader.exe`
-- Intenta ejecutar manualmente: `yt-dlp.exe --version`
+```go
+outputDir = filepath.Join(appDir, "Musica")  // Change "Musica" to your preference
+```
 
-### La descarga falla con "HTTP 429"
-- YouTube te bloqueó temporalmente por demasiadas descargas
-- Espera 1-2 horas o reduce `maxConcurrent` a 1
-- Intenta usar VPN (yt-dlp soporta proxies)
+## 🐛 Troubleshooting
 
-### No descarga de YouTube Music
-- Algunos videos de YT Music requieren autenticación
-- Prueba con una búsqueda de nombre en su lugar: `"Nombre Canción Artista"`
+### "❌ Error downloading yt-dlp"
+- Verify you have internet connection
+- Your firewall might be blocking downloads
+- Try downloading manually from: https://github.com/yt-dlp/yt-dlp/releases
 
-## 💡 Tips de uso
+### "⚠ Error with ffmpeg"
+- Same as above, verify connection
+- Or download manually from: https://github.com/GyanD/codexffmpeg/releases
+- Place `ffmpeg.exe` in the same folder as the app
 
-1. **Playlist de Spotify → YouTube** - Usa un converter online para obtener URLs de YouTube, luego cópialas al app
-2. **Busca por nombre** - `"All Too Well Taylor Swift"` funciona mejor que URLs crípticas
-3. **Combina formatos** - Puedes mezclar URLs y nombres sin problema
-4. **Renombra después** - Los MP3s se guardan con el título de YouTube, puedes renombrarlos después
-5. **Deja el .exe siempre con ffmpeg y yt-dlp** - No muevas el app a otra carpeta sin las dependencias
+### "yt-dlp not found"
+- Make sure `yt-dlp.exe` is in the same folder as `YouTubeDownloader.exe`
+- Try running manually: `yt-dlp.exe --version`
 
-## 🔒 Privacidad
+### Download fails with "HTTP 429"
+- YouTube temporarily blocked you for too many downloads
+- Wait 1-2 hours or reduce `maxConcurrent` to 1
+- Try using VPN (yt-dlp supports proxies)
 
-- Este app es **offline** (excepto al descargar yt-dlp/ffmpeg la primera vez)
-- Solo se conecta a:
-  - GitHub (para descargar yt-dlp/ffmpeg)
-  - YouTube (para descargar videos)
-- No se envía telemetría ni tracking
+### Can't download from YouTube Music
+- Some YT Music videos require authentication
+- Try searching by name instead: `"Song Name Artist"`
 
-## 📄 Licencia
+## 💡 Usage Tips
 
-MIT - Siéntete libre de usar, modificar y distribuir
+1. **Spotify Playlist → YouTube** - Use an online converter to get YouTube URLs, then copy them to the app
+2. **Search by name** - `"All Too Well Taylor Swift"` works better than cryptic URLs
+3. **Mix formats** - You can mix URLs and names without any problem
+4. **Rename later** - MP3s are saved with the YouTube title, you can rename them afterwards
+5. **Keep .exe with ffmpeg and yt-dlp** - Don't move the app to another folder without the dependencies
 
-## 👨‍💻 Desarrollo
+## 🔒 Privacy
 
-### Compilación con debug
+- This app is **offline** (except when downloading yt-dlp/ffmpeg on first run)
+- Only connects to:
+  - GitHub (to download yt-dlp/ffmpeg)
+  - YouTube (to download videos)
+- No telemetry or tracking is sent
+
+## 📄 License
+
+MIT - Feel free to use, modify, and distribute
+
+## 👨‍💻 Development
+
+### Debug Build
 
 ```bash
-go build -o YouTubeDownloader.exe .  # Sin -ldflags para debug
+go build -o YouTubeDownloader.exe .  # Without -ldflags for debugging
 ```
 
-### Cross-compile a Linux
+### Cross-compile to Linux
 
 ```bash
 GOOS=linux GOARCH=amd64 go build -o YouTubeDownloader-linux .
 ```
 
-### Ver logs en terminal
+### View logs in terminal
 
-Para debug, edita `main.go` y remueve `-H windowsgui` de los ldflags antes de compilar.
+For debugging, edit `main.go` and remove `-H windowsgui` from ldflags before compiling.
 
-## 🤝 Contribuciones
+## 🤝 Contributions
 
-Pull requests bienvenidos. Para cambios grandes, abre una issue primero.
+Pull requests welcome. For large changes, open an issue first.
 
 ## 📝 Changelog
 
-### v1.0 - Inicial
-- ✅ Descarga de canciones desde YouTube a 128kbps MP3
-- ✅ Descarga paralela (máx 3)
-- ✅ UI moderna con Fyne
-- ✅ Auto-descarga de dependencias
-- ✅ Selector nativo de carpeta Windows
+### v1.0 - Initial
+- ✅ Download songs from YouTube at 128kbps MP3
+- ✅ Parallel downloads (max 3)
+- ✅ Modern UI with Fyne
+- ✅ Auto-download dependencies
+- ✅ Native Windows folder picker
 
 ---
 
 **Made with ❤️ in Go**
 
-¿Preguntas? Abre un issue en GitHub o contacta directamente.
+Questions? Open an issue on GitHub or contact directly.
 

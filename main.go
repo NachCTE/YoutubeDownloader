@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -165,7 +164,7 @@ func pickFolderWindows() (string, error) {
 			`$d.Description = 'Seleccionar carpeta de destino';`+
 			`$d.ShowNewFolderButton = $true;`+
 			`if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }`)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	hideConsole(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -274,7 +273,7 @@ func downloadOne(idx, total int, query string) error {
 
 	cmd := exec.Command(ytdlpPath, args...)
 	cmd.Dir = appDir
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	hideConsole(cmd)
 
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()

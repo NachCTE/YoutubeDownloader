@@ -33,6 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxkbcommon-dev
+      
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
