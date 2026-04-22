@@ -1,12 +1,14 @@
 # 🎵 YouTube Downloader
 
-A portable and modern Go application to download songs from YouTube, YouTube Music, or search by name directly at **128kbps MP3**.
+A portable and modern Go application to download songs from YouTube, YouTube Music, or search by name directly to **MP3 with selectable bitrate**.
 
 ## ✨ Features
 
 - **Modern dark UI** (Fyne v2)
-- **Parallel downloads** - up to 3 songs simultaneously (configurable)
+- **Parallel downloads** - configurable concurrency from `1` to `12`
 - **Multiline text input** - paste multiple URLs/names, one per line
+- **Audio quality selector** - choose standard bitrates (`64K`, `96K`, `128K`, `160K`, `192K`, `256K`, `320K`)
+- **Download method selector** - `Auto` (with fallback), `Normal`, `Alternativo`
 - **Progress bar** showing percentage of songs completed
 - **Real-time logs** with timestamps and per-song tags
 - **Native Windows folder picker** (comfortable and large)
@@ -81,6 +83,9 @@ go build -ldflags="-H windowsgui -s -w" -o YouTubeDownloader.exe .
 │  Paste URLs or names here...        │
 │                                     │
 │ 📁 ~/Music/  [Change folder]        │
+│ Quality: [128K v]                   │
+│ Parallel: [3 v]                     │
+│ Method:  [Auto v]                   │
 ├─────────────────────────────────────┤
 │ [Download real-time log]            │
 │ [15:04:05] ✅ yt-dlp ready.         │
@@ -104,7 +109,30 @@ Hotel California Eagles
 Shape of You Ed Sheeran
 ```
 
-Press **"⬇ Download"** and all 5 songs will download in parallel (max 3 simultaneous).
+Press **"⬇ Download"** and all 5 songs will download in parallel with the value you selected.
+
+### Select Parallel Downloads
+
+- Choose from `1` to `12` simultaneous downloads
+- Recommended for most users: `4-6`
+- High values (`8+`) can cause throttling, HTTP 429, disk pressure, or UI lag depending on PC/network
+
+### Select Audio Quality
+
+Before starting, choose the quality from the selector:
+- `64K` - very small files, low quality
+- `96K` - low quality, good for voice/podcasts
+- `128K` - standard, smaller files
+- `160K` - standard+, balanced size/quality
+- `192K` - better quality/size balance
+- `256K` - high quality
+- `320K` - maximum quality, larger files
+
+### Select Download Method
+
+- `Auto` - starts with normal mode and retries with fallback if needed
+- `Normal` - standard yt-dlp extraction
+- `Alternativo` - uses alternate extraction parameters for some problematic videos
 
 ### Change Download Folder
 
@@ -150,26 +178,26 @@ Installed with `go mod tidy`:
 
 ### Change Maximum Parallel Downloads
 
-Edit `main.go` line ~24:
+Use the **Parallel** selector in the app before clicking download.
 
-```go
-const maxConcurrent = 3  // Change this number
-```
+**Options:** `1` to `12`.
 
 **Recommendations:**
-- `2-3` - For normal connections
-- `5+` - If you have fiber and YouTube doesn't block you
+- `4-6` - Best starting point for most connections
+- `7-8` - If you have strong CPU + stable fiber and no throttling
 - `1` - If you have connection issues
 
 ### Change Audio Quality
 
-Edit `main.go` in the `downloadOne()` function, find:
+Use the **Quality** selector in the app before clicking download.
 
-```go
-"--audio-quality", "128K",  // Change 128K to 192K, 256K, etc.
-```
+**Options:** `64K`, `96K`, `128K`, `160K`, `192K`, `256K`, `320K`.
 
-**Options:** `128K`, `192K`, `256K`, `320K` (maximum)
+### Change Download Method
+
+Use the **Method** selector before clicking download.
+
+**Options:** `Auto`, `Normal`, `Alternativo`.
 
 ### Change Default Folder
 
@@ -197,7 +225,7 @@ outputDir = filepath.Join(appDir, "Musica")  // Change "Musica" to your preferen
 
 ### Download fails with "HTTP 429"
 - YouTube temporarily blocked you for too many downloads
-- Wait 1-2 hours or reduce `maxConcurrent` to 1
+- Wait 1-2 hours or reduce **Parallel** to `1-3`
 - Try using VPN (yt-dlp supports proxies)
 
 ### Can't download from YouTube Music
@@ -250,7 +278,7 @@ Pull requests welcome. For large changes, open an issue first.
 
 ### v1.0 - Initial
 - ✅ Download songs from YouTube at 128kbps MP3
-- ✅ Parallel downloads (max 3)
+- ✅ Parallel downloads (configurable)
 - ✅ Modern UI with Fyne
 - ✅ Auto-download dependencies
 - ✅ Native Windows folder picker

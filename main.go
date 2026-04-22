@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -24,7 +23,20 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-const maxConcurrent = 3
+const defaultConcurrency = 3
+const highConcurrencyWarningThreshold = 8
+
+var allowedAudioQualities = []string{"64K", "96K", "128K", "160K", "192K", "256K", "320K"}
+var allowedDownloadMethods = []string{"Auto", "Normal", "Alternativo"}
+var allowedConcurrencyOptions = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12"}
+
+const defaultAudioQuality = "128K"
+const defaultDownloadMethod = "Auto"
+
+type failedItem struct {
+	name  string
+	query string
+}
 
 var (
 	overallVal  = binding.NewFloat()
@@ -85,6 +97,16 @@ func main() {
 	})
 	outputBtn.Importance = widget.LowImportance
 
+	qualityLabel := widget.NewLabel("Calidad:")
+	qualitySelect := widget.NewSelect(allowedAudioQualities, nil)
+	qualitySelect.SetSelected(defaultAudioQuality)
+	concurrencyLabel := widget.NewLabel("Paralelo:")
+	concurrencySelect := widget.NewSelect(allowedConcurrencyOptions, nil)
+	concurrencySelect.SetSelected(strconv.Itoa(defaultConcurrency))
+	methodLabel := widget.NewLabel("Metodo:")
+	methodSelect := widget.NewSelect(allowedDownloadMethods, nil)
+	methodSelect.SetSelected(defaultDownloadMethod)
+
 	var downloadBtn *widget.Button
 	downloadBtn = widget.NewButton("⬇  Descargar", func() {
 		raw := strings.TrimSpace(urlEntry.Text)
@@ -102,9 +124,15 @@ func main() {
 				queries = append(queries, q)
 			}
 		}
+		selectedQuality := normalizeAudioQuality(qualitySelect.Selected)
+		selectedConcurrency := normalizeConcurrency(concurrencySelect.Selected)
+		selectedMethod := normalizeDownloadMethod(methodSelect.Selected)
+		if selectedConcurrency >= highConcurrencyWarningThreshold {
+			appendLog(fmt.Sprintf("⚠  Paralelismo alto (%d). Si ves fallos o lentitud, proba con 4-6.", selectedConcurrency))
+		}
 		downloadBtn.Disable()
 		go func() {
-			startBatchDownload(queries)
+			startBatchDownload(queries, selectedQuality, selectedMethod, selectedConcurrency)
 			downloadBtn.Enable()
 		}()
 	})
@@ -117,7 +145,7 @@ func main() {
 	topSection := container.NewVBox(
 		entryScroll,
 		container.NewBorder(nil, nil,
-			container.NewHBox(outputLabel, outputBtn),
+			container.NewHBox(outputLabel, outputBtn, widget.NewLabel("   "), qualityLabel, qualitySelect, widget.NewLabel("   "), concurrencyLabel, concurrencySelect, widget.NewLabel("   "), methodLabel, methodSelect),
 			downloadBtn,
 			nil,
 		),
@@ -149,7 +177,7 @@ func main() {
 		} else {
 			appendLog("✅ ffmpeg listo.")
 		}
-		appendLog(fmt.Sprintf("🎵 Listo. Descarga paralela (máx %d simultáneas). Ingresá canciones y presioná Descargar.", maxConcurrent))
+		appendLog(fmt.Sprintf("🎵 Listo. Elegi calidad, metodo y paralelo (recomendado 4-6). Default: %d.", defaultConcurrency))
 	}()
 
 	w.ShowAndRun()
@@ -189,19 +217,22 @@ func appendLog(msg string) {
 
 // ─── Batch parallel download ─────────────────────────────────────────────────
 
-var progressRegex = regexp.MustCompile(`\[download\]\s+([\d.]+)%`)
-
-func startBatchDownload(queries []string) {
+func startBatchDownload(queries []string, quality string, method string, concurrency int) {
 	downloading = true
 	total := len(queries)
+	quality = normalizeAudioQuality(quality)
+	method = normalizeDownloadMethod(method)
+	concurrency = normalizeConcurrency(strconv.Itoa(concurrency))
 	overallVal.Set(0)
 	statusText.Set(fmt.Sprintf("0 / %d", total))
-	appendLog(fmt.Sprintf("📋 Iniciando descarga de %d canción(es) (máx %d en paralelo).", total, maxConcurrent))
+	appendLog(fmt.Sprintf("📋 Iniciando %d descarga(s) (paralelo %d, %s, metodo %s).", total, concurrency, quality, method))
 
 	var completed int64
 	var okCount int64
-	sem := make(chan struct{}, maxConcurrent)
+	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
+	var failedMu sync.Mutex
+	failedItems := make([]failedItem, 0)
 
 	for i, q := range queries {
 		wg.Add(1)
@@ -211,19 +242,23 @@ func startBatchDownload(queries []string) {
 			defer func() { <-sem }() // release
 
 			tag := fmt.Sprintf("[%d/%d]", idx+1, total)
-			appendLog(fmt.Sprintf("%s ▶ %s", tag, query))
+			appendLog(fmt.Sprintf("%s ▶ Iniciando", tag))
 
-			err := downloadOne(idx+1, total, query)
+			videoName, methodUsed, err := downloadOne(query, quality, method)
+			displayName := pickDisplayName(videoName, query)
 
 			done := atomic.AddInt64(&completed, 1)
 			pct := float64(done) / float64(total) * 100
 			overallVal.Set(pct)
 
 			if err != nil {
-				appendLog(fmt.Sprintf("%s ❌ Falló: %v", tag, err))
+				appendLog(fmt.Sprintf("%s ❌ %s", tag, displayName))
+				failedMu.Lock()
+				failedItems = append(failedItems, failedItem{name: displayName, query: query})
+				failedMu.Unlock()
 			} else {
 				atomic.AddInt64(&okCount, 1)
-				appendLog(fmt.Sprintf("%s ✅ Completada.", tag))
+				appendLog(fmt.Sprintf("%s ✅ %s (%s)", tag, displayName, methodUsed))
 			}
 			statusText.Set(fmt.Sprintf("%d / %d", done, total))
 		}(i, q)
@@ -240,36 +275,75 @@ func startBatchDownload(queries []string) {
 		statusText.Set(fmt.Sprintf("✅ %d/%d completadas", ok, total))
 	} else {
 		appendLog(fmt.Sprintf("⚠  Finalizado: %d OK, %d con error.", ok, failed))
+		failedMu.Lock()
+		appendLog("📌 Fallaron estas descargas:")
+		for _, item := range failedItems {
+			appendLog(fmt.Sprintf("   • %s", item.name))
+		}
+		failedMu.Unlock()
 		statusText.Set(fmt.Sprintf("⚠ %d OK / %d errores", ok, failed))
 	}
 }
 
 // ─── Single download ─────────────────────────────────────────────────────────
 
-func downloadOne(idx, total int, query string) error {
+func downloadOne(query string, quality string, method string) (string, string, error) {
 	ytdlpPath := filepath.Join(appDir, "yt-dlp.exe")
 	if runtime.GOOS != "windows" {
 		ytdlpPath = filepath.Join(appDir, "yt-dlp")
 	}
+	quality = normalizeAudioQuality(quality)
+	method = normalizeDownloadMethod(method)
 
-	tag := fmt.Sprintf("[%d/%d]", idx, total)
 	arg := query
 	if !strings.HasPrefix(query, "http://") && !strings.HasPrefix(query, "https://") {
 		arg = "ytsearch1:" + query
-		appendLog(fmt.Sprintf("   %s 🔎 Buscando: %s", tag, query))
 	}
 
+	attempts := methodsForSelection(method)
+	var lastErr error
+	bestTitle := ""
+	bestMethod := attempts[0]
+	for i, attempt := range attempts {
+		if i > 0 {
+			appendLog(fmt.Sprintf("↻ Reintentando con metodo %s...", attempt))
+		}
+		title, err := runYtDlp(ytdlpPath, arg, quality, attempt)
+		if title != "" {
+			bestTitle = title
+		}
+		if err == nil {
+			return bestTitle, attempt, nil
+		}
+		lastErr = err
+		bestMethod = attempt
+	}
+
+	if bestTitle == "" {
+		bestTitle = query
+	}
+	return bestTitle, bestMethod, lastErr
+}
+
+func runYtDlp(ytdlpPath, arg, quality, method string) (string, error) {
 	outTemplate := filepath.Join(outputDir, "%(title)s.%(ext)s")
 	args := []string{
 		"--ffmpeg-location", appDir,
 		"-x",
 		"--audio-format", "mp3",
-		"--audio-quality", "128K",
-		"--newline",
+		"--audio-quality", quality,
 		"--no-playlist",
+		"--print", "before_dl:%(title)s",
 		"-o", outTemplate,
-		arg,
 	}
+	if method == "Alternativo" {
+		args = append(args,
+			"--extractor-args", "youtube:player_client=android,web",
+			"--force-ipv4",
+			"--extractor-retries", "5",
+		)
+	}
+	args = append(args, arg)
 
 	cmd := exec.Command(ytdlpPath, args...)
 	cmd.Dir = appDir
@@ -279,46 +353,67 @@ func downloadOne(idx, total int, query string) error {
 	stderr, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("iniciando yt-dlp: %w", err)
+		return "", fmt.Errorf("iniciando yt-dlp: %w", err)
 	}
 
-	var lastPct float64
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	videoName := ""
+	firstErrLine := ""
+
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if m := progressRegex.FindStringSubmatch(line); m != nil {
-				pct, _ := strconv.ParseFloat(m[1], 64)
-				// Log only every 25% jump to avoid spam
-				if pct-lastPct >= 25 || pct >= 99 {
-					appendLog(fmt.Sprintf("   %s %.0f%%", tag, pct))
-					lastPct = pct
-				}
-			} else if strings.Contains(line, "[ExtractAudio]") {
-				appendLog(fmt.Sprintf("   %s 🎵 Convirtiendo a MP3...", tag))
-			} else if strings.Contains(line, "Destination:") {
-				// Extract just the filename
+			if strings.HasPrefix(line, "before_dl:") {
+				mu.Lock()
+				videoName = strings.TrimSpace(strings.TrimPrefix(line, "before_dl:"))
+				mu.Unlock()
+				continue
+			}
+			if strings.Contains(line, "Destination: ") {
 				parts := strings.SplitN(line, "Destination: ", 2)
 				if len(parts) == 2 {
-					appendLog(fmt.Sprintf("   %s 💾 %s", tag, filepath.Base(parts[1])))
+					base := filepath.Base(strings.TrimSpace(parts[1]))
+					mu.Lock()
+					if videoName == "" {
+						videoName = strings.TrimSuffix(base, filepath.Ext(base))
+					}
+					mu.Unlock()
 				}
-			} else if strings.HasPrefix(line, "[youtube]") || strings.HasPrefix(line, "[ytsearch]") {
-				appendLog(fmt.Sprintf("   %s %s", tag, line))
 			}
 		}
 	}()
 
 	go func() {
+		defer wg.Done()
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.Contains(line, "ERROR") {
-				appendLog(fmt.Sprintf("   %s ⚠ %s", tag, line))
+			if strings.Contains(strings.ToUpper(line), "ERROR") {
+				mu.Lock()
+				if firstErrLine == "" {
+					firstErrLine = line
+				}
+				mu.Unlock()
 			}
 		}
 	}()
 
-	return cmd.Wait()
+	err := cmd.Wait()
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if err != nil {
+		if firstErrLine != "" {
+			return videoName, fmt.Errorf("%s", firstErrLine)
+		}
+		return videoName, err
+	}
+	return videoName, nil
 }
 
 // ─── Auto-download yt-dlp ────────────────────────────────────────────────────
@@ -401,3 +496,48 @@ func shortPath(p string) string {
 	return p
 }
 
+func normalizeAudioQuality(quality string) string {
+	for _, v := range allowedAudioQualities {
+		if quality == v {
+			return quality
+		}
+	}
+	return defaultAudioQuality
+}
+
+func normalizeConcurrency(raw string) int {
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || v < 1 {
+		return defaultConcurrency
+	}
+	for _, allowed := range allowedConcurrencyOptions {
+		if allowed == strconv.Itoa(v) {
+			return v
+		}
+	}
+	return defaultConcurrency
+}
+
+func normalizeDownloadMethod(method string) string {
+	for _, v := range allowedDownloadMethods {
+		if method == v {
+			return method
+		}
+	}
+	return defaultDownloadMethod
+}
+
+func methodsForSelection(method string) []string {
+	method = normalizeDownloadMethod(method)
+	if method == "Auto" {
+		return []string{"Normal", "Alternativo"}
+	}
+	return []string{method}
+}
+
+func pickDisplayName(videoName, query string) string {
+	if strings.TrimSpace(videoName) != "" {
+		return videoName
+	}
+	return query
+}
