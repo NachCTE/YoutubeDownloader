@@ -19,12 +19,19 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
 const defaultConcurrency = 3
 const highConcurrencyWarningThreshold = 8
+
+const prefOutputDir = "output_dir"
+const prefAudioQuality = "audio_quality"
+const prefDownloadMethod = "download_method"
+const prefConcurrency = "parallel_concurrency"
 
 var allowedAudioQualities = []string{"64K", "96K", "128K", "160K", "192K", "256K", "320K"}
 var allowedDownloadMethods = []string{"Auto", "Normal", "Alternativo"}
@@ -36,6 +43,43 @@ const defaultDownloadMethod = "Auto"
 type failedItem struct {
 	name  string
 	query string
+}
+
+type iconHintButton struct {
+	*widget.Button
+	hint    string
+	onHover func(string)
+}
+
+func newIconHintButton(icon fyne.Resource, hint string, onHover func(string), tapped func()) *iconHintButton {
+	btn := widget.NewButtonWithIcon("", icon, tapped)
+	btn.Importance = widget.LowImportance
+	return &iconHintButton{Button: btn, hint: hint, onHover: onHover}
+}
+
+func newTextHintButton(label string, hint string, onHover func(string), tapped func()) *iconHintButton {
+	btn := widget.NewButton(label, tapped)
+	btn.Importance = widget.LowImportance
+	btn.Alignment = widget.ButtonAlignLeading
+	return &iconHintButton{Button: btn, hint: hint, onHover: onHover}
+}
+
+func (b *iconHintButton) MouseIn(ev *desktop.MouseEvent) {
+	b.Button.MouseIn(ev)
+	if b.onHover != nil {
+		b.onHover(b.hint)
+	}
+}
+
+func (b *iconHintButton) MouseOut() {
+	b.Button.MouseOut()
+	if b.onHover != nil {
+		b.onHover("")
+	}
+}
+
+func (b *iconHintButton) MouseMoved(ev *desktop.MouseEvent) {
+	b.Button.MouseMoved(ev)
 }
 
 var (
@@ -56,9 +100,16 @@ func main() {
 
 	a := app.New()
 	a.Settings().SetTheme(theme.DarkTheme())
+	prefs := a.Preferences()
+
+	savedOutputDir := strings.TrimSpace(prefs.String(prefOutputDir))
+	if savedOutputDir != "" {
+		outputDir = savedOutputDir
+		_ = os.MkdirAll(outputDir, 0755)
+	}
 
 	w := a.NewWindow("🎵 YouTube Downloader")
-	w.Resize(fyne.NewSize(720, 540))
+	w.Resize(fyne.NewSize(860, 700))
 	w.SetFixedSize(false)
 
 	// --- Widgets ---
@@ -83,32 +134,57 @@ func main() {
 	statusLabel := widget.NewLabelWithData(statusText)
 	statusLabel.TextStyle = fyne.TextStyle{Bold: true}
 
-	outputLabel := widget.NewLabel("📁 " + shortPath(outputDir))
+	hintText := binding.NewString()
+	hintText.Set("")
+	hintLabel := widget.NewLabelWithData(hintText)
+	outputLabel := widget.NewLabel(shortPath(outputDir))
 
-	outputBtn := widget.NewButton("Cambiar carpeta", func() {
+	setHoverHint := func(msg string) {
+		if strings.TrimSpace(msg) == "" {
+			hintText.Set("")
+			return
+		}
+		hintText.Set(msg)
+	}
+
+	outputBtn := newIconHintButton(theme.FolderOpenIcon(), "Cambiar carpeta de destino", setHoverHint, func() {
 		go func() {
 			path, err := pickFolderWindows()
-			if err != nil || path == "" {
+			if err != nil {
+				appendLog("⚠  No se pudo abrir el selector de carpeta: " + err.Error())
+				return
+			}
+			if path == "" {
 				return
 			}
 			outputDir = path
-			outputLabel.SetText("📁 " + shortPath(path))
+			prefs.SetString(prefOutputDir, path)
+			outputLabel.SetText(shortPath(path))
 		}()
 	})
-	outputBtn.Importance = widget.LowImportance
+	clearLogsBtn := newIconHintButton(theme.DeleteIcon(), "Limpiar panel de logs", setHoverHint, func() {
+		logText.Set("")
+		appendLog("🧹 Logs limpiados.")
+	})
 
-	qualityLabel := widget.NewLabel("Calidad:")
-	qualitySelect := widget.NewSelect(allowedAudioQualities, nil)
-	qualitySelect.SetSelected(defaultAudioQuality)
-	concurrencyLabel := widget.NewLabel("Paralelo:")
-	concurrencySelect := widget.NewSelect(allowedConcurrencyOptions, nil)
-	concurrencySelect.SetSelected(strconv.Itoa(defaultConcurrency))
-	methodLabel := widget.NewLabel("Metodo:")
-	methodSelect := widget.NewSelect(allowedDownloadMethods, nil)
-	methodSelect.SetSelected(defaultDownloadMethod)
+	qualityLabel := widget.NewLabel("Calidad")
+	qualitySelect := widget.NewSelect(allowedAudioQualities, func(value string) {
+		prefs.SetString(prefAudioQuality, normalizeAudioQuality(value))
+	})
+	qualitySelect.SetSelected(normalizeAudioQuality(prefs.StringWithFallback(prefAudioQuality, defaultAudioQuality)))
+	concurrencyLabel := widget.NewLabel("Paralelo")
+	concurrencySelect := widget.NewSelect(allowedConcurrencyOptions, func(value string) {
+		prefs.SetInt(prefConcurrency, normalizeConcurrency(value))
+	})
+	concurrencySelect.SetSelected(strconv.Itoa(normalizeConcurrency(strconv.Itoa(prefs.IntWithFallback(prefConcurrency, defaultConcurrency)))))
+	methodLabel := widget.NewLabel("Metodo")
+	methodSelect := widget.NewSelect(allowedDownloadMethods, func(value string) {
+		prefs.SetString(prefDownloadMethod, normalizeDownloadMethod(value))
+	})
+	methodSelect.SetSelected(normalizeDownloadMethod(prefs.StringWithFallback(prefDownloadMethod, defaultDownloadMethod)))
 
-	var downloadBtn *widget.Button
-	downloadBtn = widget.NewButton("⬇  Descargar", func() {
+	var downloadBtn *iconHintButton
+	downloadBtn = newIconHintButton(theme.DownloadIcon(), "Iniciar descargas", setHoverHint, func() {
 		raw := strings.TrimSpace(urlEntry.Text)
 		if raw == "" {
 			appendLog("⚠  Ingresá al menos una URL o nombre de canción.")
@@ -117,12 +193,13 @@ func main() {
 		if downloading {
 			return
 		}
-		var queries []string
-		for _, line := range strings.Split(raw, "\n") {
-			q := strings.TrimSpace(line)
-			if q != "" {
-				queries = append(queries, q)
-			}
+		queries, duplicates := normalizeQueries(raw)
+		if len(queries) == 0 {
+			appendLog("⚠  No hay entradas validas para descargar.")
+			return
+		}
+		if duplicates > 0 {
+			appendLog(fmt.Sprintf("ℹ  Se omitieron %d entrada(s) duplicada(s).", duplicates))
 		}
 		selectedQuality := normalizeAudioQuality(qualitySelect.Selected)
 		selectedConcurrency := normalizeConcurrency(concurrencySelect.Selected)
@@ -138,29 +215,37 @@ func main() {
 	})
 	downloadBtn.Importance = widget.HighImportance
 
-	// Progress row
-	progressRow := container.NewBorder(nil, nil, widget.NewLabel("Progreso:"), statusLabel, overallBar)
+	progressRow := container.NewBorder(nil, nil, widget.NewLabel("Progreso"), statusLabel, overallBar)
 
-	// Layout
-	topSection := container.NewVBox(
-		entryScroll,
-		container.NewBorder(nil, nil,
-			container.NewHBox(outputLabel, outputBtn, widget.NewLabel("   "), qualityLabel, qualitySelect, widget.NewLabel("   "), concurrencyLabel, concurrencySelect, widget.NewLabel("   "), methodLabel, methodSelect),
-			downloadBtn,
-			nil,
-		),
-		widget.NewSeparator(),
-	)
-	bottomSection := container.NewVBox(
-		widget.NewSeparator(),
-		progressRow,
+	settingsGrid := container.NewGridWithColumns(3,
+		container.NewVBox(qualityLabel, qualitySelect),
+		container.NewVBox(concurrencyLabel, concurrencySelect),
+		container.NewVBox(methodLabel, methodSelect),
 	)
 
-	content := container.NewBorder(
-		topSection,
-		bottomSection,
-		nil, nil,
-		container.NewPadded(logScroll),
+	actionRow := container.NewHBox(
+		clearLogsBtn,
+		outputBtn,
+		outputLabel,
+		layout.NewSpacer(),
+		downloadBtn,
+	)
+
+	inputCard := widget.NewCard("Entradas", "Pegá URLs o nombres (una por linea)", entryScroll)
+	controlsCard := widget.NewCard("Controles", "Configuracion de descarga", container.NewVBox(
+		actionRow,
+		hintLabel,
+		widget.NewSeparator(),
+		settingsGrid,
+	))
+	logsCard := widget.NewCard("Actividad", "Eventos importantes", logScroll)
+	progressCard := widget.NewCard("Estado", "", progressRow)
+
+	content := container.NewVBox(
+		inputCard,
+		controlsCard,
+		logsCard,
+		progressCard,
 	)
 
 	w.SetContent(content)
@@ -186,7 +271,7 @@ func main() {
 // ─── Windows native folder picker ───────────────────────────────────────────
 
 func pickFolderWindows() (string, error) {
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-Command",
 		`Add-Type -AssemblyName System.Windows.Forms;`+
 			`$d = New-Object System.Windows.Forms.FolderBrowserDialog;`+
 			`$d.Description = 'Seleccionar carpeta de destino';`+
@@ -494,6 +579,60 @@ func shortPath(p string) string {
 		return "~" + p[len(home):]
 	}
 	return p
+}
+
+func normalizeQueries(raw string) ([]string, int) {
+	lines := strings.Split(raw, "\n")
+	seen := make(map[string]struct{}, len(lines))
+	queries := make([]string, 0, len(lines))
+	duplicates := 0
+	for _, line := range lines {
+		q := strings.TrimSpace(line)
+		if q == "" {
+			continue
+		}
+		key := strings.ToLower(q)
+		if _, exists := seen[key]; exists {
+			duplicates++
+			continue
+		}
+		seen[key] = struct{}{}
+		queries = append(queries, q)
+	}
+	return queries, duplicates
+}
+
+func openFolder(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("ruta vacia")
+	}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("creando carpeta: %w", err)
+	}
+	cleanPath := filepath.Clean(path)
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		absPath = cleanPath
+	}
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("explorer.exe", "/select,", absPath)
+	case "darwin":
+		cmd = exec.Command("open", absPath)
+	default:
+		cmd = exec.Command("xdg-open", absPath)
+	}
+	hideConsole(cmd)
+	if err := cmd.Start(); err == nil {
+		return nil
+	}
+	if runtime.GOOS == "windows" {
+		fallback := exec.Command("cmd", "/C", "start", "", "\""+absPath+"\"")
+		hideConsole(fallback)
+		return fallback.Start()
+	}
+	return cmd.Start()
 }
 
 func normalizeAudioQuality(quality string) string {

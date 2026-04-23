@@ -9,6 +9,9 @@ A portable and modern Go application to download songs from YouTube, YouTube Mus
 - **Multiline text input** - paste multiple URLs/names, one per line
 - **Audio quality selector** - choose standard bitrates (`64K`, `96K`, `128K`, `160K`, `192K`, `256K`, `320K`)
 - **Download method selector** - `Auto` (with fallback), `Normal`, `Alternativo`
+- **Preferences persistence** - remembers quality, method, parallel value, and output folder
+- **Icon actions + hover hints** - compact toolbar with contextual hints on mouse hover
+- **Smart input cleanup** - duplicate lines are ignored automatically
 - **Progress bar** showing percentage of songs completed
 - **Real-time logs** with timestamps and per-song tags
 - **Native Windows folder picker** (comfortable and large)
@@ -82,10 +85,14 @@ go build -ldflags="-H windowsgui -s -w" -o YouTubeDownloader.exe .
 │ [Multiline text box]                │
 │  Paste URLs or names here...        │
 │                                     │
-│ 📁 ~/Music/  [Change folder]        │
-│ Quality: [128K v]                   │
-│ Parallel: [3 v]                     │
-│ Method:  [Auto v]                   │
+│ Entradas (URLs o nombres)           │
+│-------------------------------------│
+│ Controles                           │
+│ 📁 ~/Music/                         │
+│ [icon] [icon] [icon]        [icon] │
+│ Tip: hover para ver cada accion     │
+│ Calidad   Paralelo   Metodo         │
+│ [128K v]  [3 v]      [Auto v]       │
 ├─────────────────────────────────────┤
 │ [Download real-time log]            │
 │ [15:04:05] ✅ yt-dlp ready.         │
@@ -110,6 +117,10 @@ Shape of You Ed Sheeran
 ```
 
 Press **"⬇ Download"** and all 5 songs will download in parallel with the value you selected.
+
+The top action bar uses icons only; move the mouse over each icon to see what it does.
+
+If you paste duplicated lines, the app skips them automatically and shows how many were ignored.
 
 ### Select Parallel Downloads
 
@@ -140,6 +151,7 @@ Before starting, choose the quality from the selector:
 2. The native Windows explorer opens
 3. Select a folder and press OK
 4. Future downloads will go to that folder
+5. The app remembers this folder for next runs
 
 ## 🏗️ Project Structure
 
